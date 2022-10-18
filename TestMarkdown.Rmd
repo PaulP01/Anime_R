@@ -1,0 +1,450 @@
+---
+title: "Quels sont les animés les plus populaires ?"
+output:
+  html_document:
+    df_print: paged
+    theme: lumen
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+
+```{r, include = FALSE}
+
+list.of.packages <- c("ggplot2", "rmarkdown", "dplyr", "plyr","data.table")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library(ggplot2)
+library(dplyr)
+library(rmarkdown)
+library(plyr)
+library(data.table)
+
+
+df <- read.csv("base_anime.csv", sep = ",")
+src <- read.csv("source.csv", sep = ",")
+sta <- read.csv("status.csv", sep = ",")
+tpe <- read.csv("type.csv", sep = ",")
+gnr <- read.csv("genres.csv", sep = ";")
+colnames(gnr)<-c("anime_id",   "Action"      ,  "Adventure"  ,   "Avant.Garde" ,  "Award.Winning", "Boys.Love"   ,  "Comedy" ,"Drama"        , "Ecchi"         ,"Erotica"    ,   "Fantasy" ,      "Girls.Love" ,   "Gourmet"     ,  "Hentai" ,      "Horror" ,       "Mystery"       ,"Romance"    ,   "Sci.Fi"    ,    "Slice.of.Life" ,"Sports"  ,      "Supernatural" , "Suspense"  )
+
+
+tpe$type[tpe$type %in% c("")]<-"None"
+src$source[src$source %in% c("")]<-"None"
+
+df <-
+  merge(x = df,
+        y = tpe,
+        by.x = "type_id",
+        by.y = "id",
+        all.x = TRUE)
+
+df <-
+  merge(x = df,
+        y = sta,
+        by.x = "statut_id",
+        by.y = "id",
+        all.x = TRUE)
+
+df <-
+  merge(x = df,
+        y = src,
+        by.x = "source_id",
+        by.y = "id",
+        all.x = TRUE)
+
+dff <-
+  merge(x = df,
+        y = gnr,
+        by.x = "anime_id",
+        by.y = "anime_id",
+        all.x = TRUE)
+
+
+
+
+df <- select(df,-genres)
+df <- select(df,-themes)
+
+```
+
+
+
+Pour ce devoir, nous devions trouver un thème ainsi qu'une problématique a étudier. Nous avons donc choisi de travailler sur les données du site MyAnimeList, qui recense de multiples informations à propos des mangas ainsi que des animés. 
+
+
+Nous avons choisi de travailler uniquement sur les données concernant les animés. Aujourd'hui, il y a un très grand nombre d'animés, comme nous allons pouvoir le voir par la suite. Il est donc difficle de savoir lesquelles sont les plus populaires. A travers cette analyse des données, nous allons essayer de voir quels sont les animés les plus populaires, et donc ceux qui pourrait plaire aux personnes qui cherchent à regarder un bon animé.
+
+
+Nous avons 6 tables, que nous allons présenter plus en détails ci-dessous.
+
+
+
+### **Présentation des bases de données**
+
+
+Dans la partie qui va suivre, nous allons présenter les 4 tables avec lesquelles nous travaillons. Nous allons pour 3 d'entre elles, présentés la répartition des animés selon les attributs qu'elles possèdent.
+
+
+**base_anime :**
+
+
+Dans cette base de données, nous avons un total de 24 165 lignes présentant différent animé ansi que 29 variables qui vont nous permettres de meiux analysés les données.
+Il y a certaine variable qui ne sont pas très compréhensible et nous allons les expliquer ci-dessous :
+
+
+- members : Correspond au nombre de personnes ayant mis cet animé dans une de leur liste.
+
+
+- sfw : Si "Yes" alors l'animé est catégorisé pour adulte.
+
+
+- demographics : Correspond à la catégorie de personne qui est visé par l'oeuvre.
+
+
+- source_id, type-id et statut-id seront expliqué par la suite.
+
+
+Voici à quoi ressemble une ligne de cette base de données :
+
+```{r, echo = FALSE}
+
+df[c(20662),]
+
+```
+<br>
+
+
+On peut voir par exemple une évolution du nombre d'animé par année :
+
+
+```{r, echo = FALSE, fig.asp = 0.5, fig.width = 15}
+
+dfdate <- table(df$start_year)
+
+
+barl <-plot(dfdate,
+        type = "o",
+        xlab = "Année",
+        ylab = "Nombre d'animés",
+        main = "Nombre d'animés par année ",
+        col = "steelblue", col.main = "black", ylim = c(0,1000))
+#text(barl, dfdate + 50, labels = dfdate)
+
+
+```
+<br>
+On remarque qu'il y a depuis la fin des années 90, un plus grand nombre d'animés qui sortent. La dernière année enregistrée est 2023. C'est pour cela que le nombre est bien inférieur à la tendance des années précedentes. Il est de même pour 2022, dans une moindre mesure, car tout les animés de l'année n'ont pas encore été annoncé ou ajouté, n'étant pas encore sorti.
+<br>
+
+
+**Sources :**
+
+
+Cette base de données est lié à la variable "source_id" de base_anime. Certains n'ont pas de sources spécifiées  :
+
+```{r, echo = FALSE}
+
+src
+```
+Cette base de données répertorie toutes les sources possibles des quelles, les animés proviennent. Le nombre de sources possible est de 17, sachant que nous avons une source nommé "None" car la source nous est inconnue. 
+
+
+- 4 koma manga : Manga en quatre cases disposés de manière verticale, à tendance le plus souvent humoristique.
+
+
+Distribution des animés par sources :
+
+
+```{r, echo = FALSE, fig.asp = 0.8, fig.width = 20}
+
+dfsource <- table(df$source)
+
+
+barp <-barplot(sort(dfsource, decreasing = TRUE),
+        xlab = "Sources",
+        ylab = "Nombre d'animés",
+        main = "Répartition des sources d'animés ",
+        col = "steelblue", col.main = "black", ylim = c(0,11000), cex.main = 2, cex.axis = 1.5, cex.lab = 1.5, cex.names = 1.25)
+text(barp, sort(dfsource + 400, decreasing = TRUE), labels = sort(dfsource, decreasing = TRUE), cex = 1.5)
+
+```
+<br>
+Il y a 2 sources différentes qui sortent réellement du lot, et qui sont "original" et "manga", car pour "None" nous ne connaissons pas la provenance. Les animé originaux représentent près de 37% des animés présent dans la base de données, soit plus d'un tiers. Les animés originaux ont été crée pour ou par un studio d'animation et ne proviennent donc pas d'un manga ou d'un novel. Les animés qui adapte un manga sont eux, au nombre de 4427 et représente près de 18% des animés de la base et est par conséquent la deuxième source la plus fréquente. Cela peut s'expliquer par le grand nombre de manga existant aujourd'hui.
+
+
+On retrouve ensuite les adaptations de jeux vidéos ainsi que des visual novel, light novel et novel que l'on pourrais catégoriser comme des romans au Japon.
+<br>
+
+
+**Statuts :**
+
+
+Cette base de donnée correspond au statut de l'animé au moment de l'extraction des données. Les animés peuvent être :
+
+
+- Fini (finished_airing)  
+
+
+- En cours de diffusion (currently_airing)
+
+
+- A venir (not_yet_started)
+
+
+```{r, echo = FALSE}
+
+sta
+```
+
+<center>
+```{r, echo = FALSE}
+dfstatut <- table(df$status)
+
+
+barp <-barplot(sort(dfstatut, decreasing = TRUE),
+        xlab = "Statut",
+        ylab = "Nombre d'animés",
+        main = "Répartition du statut des animés ",
+        col = "steelblue", col.main = "black", ylim = c(0,25000))
+text(barp, sort(dfstatut + 1200, decreasing = TRUE), labels = sort(dfstatut, decreasing = TRUE))
+```
+</center>
+
+
+Ici les chiffres sont plus que logiques. Le nombre d'animés terminés représente plus de 95% des animés que nous étudions. Cela est normal dû au fait qu'un animé se déroule généralement en saison de 12 à 25 épisodes qui sortent de manière générale à chaque saison de l'année. De plus les plus vieux animés recensés datent des années 1920 / 1930. Il y a eu donc depuis ces années plusieurs milliers d'animés qui ont eu le temps de se terminer. 
+
+
+Ainsi les animés en cours de diffusion lors de l'extraction sont ceux étant sorti lors de la saison printemps 2022. On peut y ajouter le peux d'animés qui ont une diffusion hebdomadaire comme One Piece qui est diffusé depuis le 20 octobre 1999.
+<br>
+
+
+-  **Types :**
+
+
+Cette table correspond au type de l'animés, c'est-à-dire si c'est une série, un film ou bien pour une musique...
+
+
+```{r, echo = FALSE}
+
+tpe
+```
+<br>
+
+
+On retrouve donc 6 types différents ainsi qu'une catégorisation "None" pour ceux dont les données étaient manquantes. Certains types ne sont pas forcément compréhensibles, nous allons donc les expliquer ci-dessous :
+
+- ona : Ce sont les animés diffusés directement sur Internet en streaming, au lieu de moyens plus classiques comme la télévision ou le cinéma.
+
+
+- ova : L'OVA se présente en majorité sous la forme d'un épisode d'animé bonus destiné à mettre en avant l'exploitation vidéo d'une série.
+
+
+- spécial : Ce sont des épisodes sorties pour des raisons comme Noël ou bien même Pâques.
+
+
+<center>
+```{r, echo = FALSE}
+
+dftype <- table(df$type)
+barp <-barplot(sort(dftype, decreasing = TRUE),
+        xlab = "Type d'animés",
+        ylab = "Nombre d'animés",
+        main = "Répartition du type d'animés ",
+        col = "steelblue", col.main = "black", ylim = c(0,9500))
+
+text(barp, sort(dftype + 700, decreasing = TRUE), labels = sort(dftype, decreasing = TRUE))
+
+
+#dff <- dff[order(dff$type, decreasing = TRUE),]
+#bp <- barplot(table(dff$type), col = rainbow(7))
+
+
+```
+</center>
+<br>
+
+
+**Genres :**
+
+
+Cette table comprend 21 genres ainsi que l'id de l'animé. Tout comme la table "themes", nous allons grâce à des booléens, pouvoir savoir si un thème est rattaché ou non à un animé.
+
+
+```{r, echo = FALSE}
+
+gnr[c(0:5),]
+```
+<br>
+
+
+Nous allons ainsi pouvoir voir quels sont les genres les plus présents et par la suite, savoir lesquelles sont les plus appréciés.
+
+
+```{r, echo = FALSE, fig.asp = 0.8, fig.width = 20}
+
+nb_action<-nrow(gnr[gnr$Action == "VRAI",]) 
+df_final<-data.frame(Genre="Action",n=nb_action)
+
+
+list_genres<-c(names(gnr))[-c(1,2)]
+
+for (i in list_genres){
+  nb_genres<-nrow(gnr[gnr[i] == "VRAI",]) 
+  nb_genres
+  vector <- c(i,nb_genres)
+  
+  df_final[nrow(df_final)+1,]<-vector
+}
+
+df_final$n <- as.numeric(df_final$n)
+df_final <- df_final[order(df_final$n, decreasing = TRUE),]
+
+barp <- barplot(df_final$n,
+                col = "steelblue",
+                xlab = "Nombre d'animés",
+                ylab = "Genres",
+                main = "Nombre d'animés par genre",
+                col.main = "black", ylim = c(0,9000), cex.main = 2, cex.axis = 1.5, cex.lab = 1.5, cex.names = 1.25)
+text(barp, sort(df_final$n + 200, decreasing = TRUE), labels = sort(df_final$n, decreasing = TRUE), cex = 1.5)
+#text(barp, df_final$Genre, labels = df_final$Genre, cex = 1.5, xpd = TRUE, srt=45, adj = c(1.1,1.1))
+
+df_final
+
+```
+<br>
+
+
+Les genres qui sont les plus présents sont donc Comedy, Fantasy, Action et Adventure. Généralement, ce sont des genres qui vont ensemble. Beaucoup d'animés d'action sont aussi répertorié en aventure ainsi qu'en comedy et parfois fantasy. C'est pour cela que la différence avec les autres genres est assez importante.
+
+### **Analyses des données**
+
+
+Pour l'analyse des données nous allons devoir croiser des variables afin d'obtenir des informations supplémenraire. 
+
+Pour commencer nous allons voire la moyenne des animés par années :
+
+<center>
+```{r, echo = FALSE}
+
+
+df_1917<-df[df$start_year == 1917,]
+df_final<-data.frame(Annee="1917",n=mean(df_1917$score,na.rm = T))
+df_final
+for (i in c(names(table(df$start_year)))[-c(1)]){
+  
+  df_annee<-df[df$start_year == i,]
+  
+  vector <- c(i,mean(df_annee$score,na.rm = T))
+  
+  df_final[nrow(df_final)+1,]<-vector
+}
+class(df_final$n)
+df_test<- data.frame(Annee=as.integer(df_final$Annee),n=as.numeric(df_final$n))
+df_test<- data.frame(Annee=df_test$Annee,n=round(df_test$n,2))
+
+ggplot(df_test,aes(x=Annee, y=n,fill=n)) + 
+  geom_line(stat = "identity")+
+  geom_point(shape=21, color="black", fill="#69b3a2", size=1.5) +
+  ggtitle("Moyenne des notes d'animes par Année") +
+  xlab("Annee") + ylab("Moyenne des notes")+
+  theme(legend.position = "none")
+
+```
+</center>
+
+
+On peut voire qu'avant les années 70, les moyennes étaient en grande majorité en dessous de 6. A partir des années 70 et jusqu'aux années 2000, les animés sont restés dans une moyenne entre 6 et 6.6. Depuis les années 2000, la moyenne des scores des animés, à une évolution plus régulière d'une année à l'autre et semble suivre une tendance. Malgré la baisse ainsi que la stagnation entre 2008 et 2017, la moyenne semble être en constante augmentation. Ainsi nous pouvons déjà dire que les animés des années 2000 ou plus semble plus populaires du fait d'une moyenne générale plus élevé, bien qu'il y ait un nombre d'animés qui sorte également plus conséquent.
+<br>
+
+
+**Moyenne des notes par score**
+
+
+Nous allons maintenant essayer de voir quels sont les genres ayant récoltés les meilleures notes.
+
+
+```{r, echo = FALSE}
+
+df_action<-dff[dff$Action == "VRAI",]
+
+df_final<-data.frame(Genre="Action",n=mean(df_action$score,na.rm = T))
+
+
+list_genres<-c(names(gnr))[-c(1,2)]
+
+for (i in list_genres){
+  
+  df_genre<-dff[dff[i] == "VRAI",]
+  
+  vector <- c(i,mean(df_genre$score,na.rm = T))
+  
+  df_final[nrow(df_final)+1,]<-vector
+}
+df_test<- data.frame(Genre=df_final$Genre,n=as.numeric(df_final$n))
+df_test<- data.frame(Genre=df_test$Genre,n=round(df_test$n,2))
+
+dff_order<-df_test[order(df_test[,'n'],decreasing=T),]
+colnames(dff_order)<-c("Genre","Note moyenne")
+dff_order
+
+
+ggplot(df_test,aes(x=Genre, y=n,fill=n)) + 
+  geom_bar(stat = "identity")+
+  ggtitle("Moyenne des notes d'animes par genre") +
+  xlab("Genre") + ylab("Moyenne des notes")+
+  theme(legend.position = "none")
+
+
+
+
+
+
+
+```
+<br>
+
+
+On peut voir que les animés les mieux noté sont ceux ayant reçu un award, ce qui est logique, étant de plus peu nombreux dans la base de données. Il vient ensuite mystery et suspense. Etant des genres moins présents que Comedy par exemple, la popularité de ces animés est moins impacté et ainsi leur moyenne en pâtit moins.
+<br>
+
+
+**Note et favoris**
+
+
+Dans cette partie, nous allons comparer les animés avec la meilleure note à ceux avec le ratio favoris/membres le plus élevé.
+
+
+
+```{r, echo = FALSE}
+
+df <- df[order(df$score, decreasing = TRUE),]
+df[c(1:10),c("title","start_year","members","favorites","score")]
+
+df2 <- df[df$members >= 10000,c(1:29),]
+df2$ratio_favori_membre <- (df2$favorites / df2$members) * 100
+
+df2 <- df2[order(df2$ratio_favori_membre, decreasing = TRUE),]
+df2[c(1:10),c("title","start_year","score","members","favorites","ratio_favori_membre")]
+
+
+```
+<br>
+
+
+On peut voir qu'il n'y a que deux animés qui sont présent dans ces 2 tableaux : Fullmetal Alchemist Brotherhood ainsi que Steins;Gate. Gintama est aussi présent, mais il ne s'agit pas de la même saison comme on peut le voir avec la variable start_year. 
+
+
+Pour ce qui est des notes, on peut voir que ce sont en majorité des animés datant des années 2010 et 2020 alors qu'a contrario, les animés ayant le meilleur ratio datent des année 80 jusqu'aux années 2000. On peut dire que les animés récent jouisse d'une meilleure appréciation probablement due au fait que les personnes suivent les sortis et son donc à jour concernant les animés sorti récemment ou qui vont sortir. Les animés plus anciens (en tout cas dans ce top 10) ont peut-être des notes légèrement moins élevées, mais le fait qu'avec souvent plus d'un million de membres, ils arrivent à avoir un pourcentage de personnes les ayant mis dans leurs animés favoris proche de 5%, prouve que même sur la durée, l'animé peut jouir d'une forte popularité.
+
+
+
+### **Conclusion**
+
+On peut en conclure que de manière générale, les animés les plus populaires sont ceux sortis depuis le début des années 2000. Qu'il date d'il y a 2 ans ou 15 ans, il reste généralement mieux noté que les animés plus anciens. Les animés de comédie, d'action et d'aventure étant ceux qui sortent les plus, sont ceux qui doivent marcher le plus et ainsi être le plus populaire chez les personnes qui regardent les animés. Tout ce qui touche au mystère et au suspense est moins présent, mais les notes sont en moyenne plus élevées et montrent qu'ils sont très appreciés par le publique en générale.
+
